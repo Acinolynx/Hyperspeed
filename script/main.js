@@ -7,7 +7,7 @@ window.onload = () => {
 
     document.body.appendChild(renderer.domElement);
 
-    const gameInstance = new game(scene, camera);
+    const gameInstance = new Game(scene, camera);
 
     function animate() {
         requestAnimationFrame(animate);
