@@ -5,15 +5,29 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Hyperspeed</title>
     <link rel="stylesheet" href="./style/style.css">
-</head>
-<body>
-    
-
-
-
     <script src="./vendors/three.min.js"></script>
+    <script src="./script/lerp.js"></script>
     <script src="./script/game.js"></script>
     <script src="./script/main.js"></script>
+
+</head>
+<body>
+    <div id="info">
+        <div id="title">Captain's Log</div>
+        <diV class="divider"></diV>
+        <div id="score-row ">Score:<div id="score"></div></div>
+        <div id="distance-row">Distance:<div id="distance"></div></div>
+        <div class="divider"></diV>
+        <div>Ship's Integrity:</div>    
+        <input id="health" type="range" min="0" max="100" disabled> 
+    </div>
+
+    <div id="intro-panel">
+        <div id="intro-column">
+            <div id="intro-title">Hyperspeed</div>
+            <button id="start-button">Start</button>
+        </div>
+    </div>
 
 </body>
 </html>
