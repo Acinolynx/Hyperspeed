@@ -2,35 +2,29 @@ class Game {
     OBSTACLE_PREFAB = new THREE.BoxBufferGeometry(1, 1, 1);
     OBSTACLE_MATERIAL = new THREE.MeshBasicMaterial({ color: 0xccddeee });
     BONUS_PREFAB = new THREE.SphereBufferGeometry(1, 12, 12);
-    COLLISION_THRESHOLD = 0.05;  // Reduced threshold for better consistency
 
     constructor(scene, camera) {
-        this._initializeScene(scene, camera);
-
-        this.running = false;
-
-        this.speedZ = 50;
-        this.speedX = 0; // -1: left, 0: straight, 1: right
-        this.translateX = 0;
-
-        this.health = 100;
-        this.score = 0;
-        this.time = 0;
-
-        this.rotationLerp = null;
 
         this.divScore = document.getElementById('score');
         this.divDistance = document.getElementById('distance');
         this.divHealth = document.getElementById('health');
 
+        this.divGameOverPanel = document.getElementById('game-over-panel');
+        this.divGameOverScore = document.getElementById('game-over-score');
+        this.divGameOverDistance = document.getElementById('game-over-distance');
+
         document.getElementById('start-button').onclick = () => {
             this.running = true;
             document.getElementById('intro-panel').style.display = 'none';
         };
+        document.getElementById('replay-button').onclick = () => {
+            this.running = true;
+            this.divGameOverPanel.style.display = 'none';
+        };
 
-        this.divScore.innerText = this.score;
-        this.divDistance.innerText = 0;
-        this.divHealth.value = this.health;
+        this.scene = scene;
+        this.camera = camera;
+        this._reset(false);
         
         document.addEventListener('keydown', this._keydown.bind(this));
         document.addEventListener('keyup', this._keyup.bind(this));
@@ -49,12 +43,38 @@ class Game {
         if (this.rotationLerp !== null) {
             this.rotationLerp.update(timeDelta);
         }
+        if (this.cameraLerp !== null) {
+            this.cameraLerp.update(timeDelta);
+        }
 
         this.translateX += this.speedX * -0.05;
 
         this._updateGrid();
         this._checkCollisions();
         this._updateInfoPanel();
+    }
+
+    _reset(replay) {
+        this.running = false;
+
+        this.speedZ = 20;
+        this.speedX = 0; // -1: left, 0: straight, 1: right
+        this.translateX = 0;
+
+        this.time = 0;
+        this.clock = new THREE.Clock();
+
+        this.health = 100;
+        this.score = 0;
+
+        this.rotationLerp = null;
+        this.cameraLerp = null;
+
+        this.divScore.innerText = this.score;
+        this.divDistance.innerText = 0;
+        this.divHealth.value = this.health;
+
+        this._initializeScene(this.scene, this.camera, replay);
     }
 
     _keydown(event) {
@@ -89,6 +109,9 @@ class Game {
     }
 
     _updateGrid() {
+        this.speedZ += 0.002;
+
+        this.grid.material.uniforms.speedZ.value = this.speedZ;
         this.grid.material.uniforms.time.value = this.time;
         this.objectsParent.position.z = this.speedZ * this.time;
         this.grid.material.uniforms.translateX.value = this.translateX;
@@ -111,34 +134,47 @@ class Game {
     }
 
     _checkCollisions() {
+        // Calculate ship's bounding box
+        const shipBoundingBox = new THREE.Box3().setFromObject(this.ship);
+
+        // Check against every object (obstacle and bonus)
         this.objectsParent.traverse((child) => {
             if (child instanceof THREE.Mesh) {
-                const childZPos = child.position.z + this.objectsParent.position.z;
-
-                // Create bounding boxes
-                const shipBoundingBox = new THREE.Box3().setFromObject(this.ship);
+                // Calculate object's bounding box
                 const childBoundingBox = new THREE.Box3().setFromObject(child);
-                
-                // Expand bounding box for collision threshold
-                childBoundingBox.expandByScalar(this.COLLISION_THRESHOLD);
-    
-                // Check for overlap
+
+                // Check if bounding boxes intersect
                 if (shipBoundingBox.intersectsBox(childBoundingBox)) {
                     const params = [child, -this.translateX, -this.objectsParent.position.z];
                     console.log("Collision detected with:", child.userData.type);
-    
+
                     if (child.userData.type === 'obstacle') {
+                        if (soundAudio)
+                            soundAudio.play('collect-coin');
                         this.health -= 10;
                         this.divHealth.value = this.health;
                         this._setupObstacle(...params);
-                    } else if (child.userData.type === 'bonus') {
+                        this._shakeCamera({
+                            x: this.camera.position.x,
+                            y: this.camera.position.y,
+                            z: this.camera.position.z,
+                        });
+                        if (this.health <= 0)
+                            this._gameOver();
+                        }
+                        else{
+                            if (soundAudio) {
+                                soundAudio.play('collect-coin');
+                            }
+                        
+                        this._createScorePopup(child.userData.price);
                         this.score += child.userData.price;
                         this.divScore.innerText = this.score;
                         child.userData.price = this._setupBonus(...params);
                     }
                 }
             }
-        });        
+        });
     }
 
     _updateInfoPanel() {
@@ -147,7 +183,16 @@ class Game {
     }
 
     _gameOver() {
-        // Handle game over logic 
+        // Handle game over logic
+        this.running = false;
+
+        this.divGameOverScore.innerText = this.score;
+        this.divGameOverDistance.innerText = this.objectsParent.position.z.toFixed(0);
+        setTimeout(() => {
+            this.divGameOverPanel.style.display = 'grid';
+
+            this._reset(true);
+        }, 1000);
     }
 
     _createShip(scene) {
@@ -203,17 +248,21 @@ class Game {
         let divisions = 30;
         let gridLimit = 200;
         this.grid = new THREE.GridHelper(gridLimit + 2, divisions, 0xccddee, 0xccddee);
-
+    
         const moveableX = [];
         const moveableZ = [];
-        for (let i = 0; i < divisions; i++) {
-            moveableX.push(0, 0, 1, 1);
-            moveableZ.push(1, 1, 0, 0);
+        
+        // Properly fill the moveableX and moveableZ arrays with float values (0.0 or 1.0)
+        for (let i = 0; i <= divisions; i++) {
+            moveableX.push(0.0, 0.0, 1.0, 1.0); // Floats, not integers
+            moveableZ.push(1.0, 1.0, 0.0, 0.0); // Floats, not integers
         }
-
-        this.grid.geometry.setAttribute('moveableX', new THREE.BufferAttribute(new Uint8Array(moveableX), 1));
-        this.grid.geometry.setAttribute('moveableZ', new THREE.BufferAttribute(new Uint8Array(moveableZ), 1));
-
+    
+        // Set attributes using Float32Array instead of Uint8Array
+        this.grid.geometry.setAttribute('moveableX', new THREE.BufferAttribute(new Float32Array(moveableX), 1));
+        this.grid.geometry.setAttribute('moveableZ', new THREE.BufferAttribute(new Float32Array(moveableZ), 1));
+    
+        // Define a ShaderMaterial with fixed conditions
         this.grid.material = new THREE.ShaderMaterial({
             uniforms: {
                 speedZ: { value: this.speedZ },
@@ -226,51 +275,86 @@ class Game {
                 uniform vec2 gridLimits;
                 uniform float speedZ;
                 uniform float translateX;
+    
                 attribute float moveableX;
                 attribute float moveableZ;
+                attribute vec3 color; // Assuming a color attribute is used
+    
                 varying vec3 vColor;
+    
                 void main() {
-                    vColor = color;
+                    float limLen = gridLimits.y - gridLimits.x;
                     vec3 pos = position;
-                    pos.x += moveableX * speedZ * time;
-                    pos.z += moveableZ * speedZ * time;
-                    pos.x += translateX;
-                    pos.x = clamp(pos.x, gridLimits.x, gridLimits.y);
+    
+                    // Use more straightforward conditions
+                    if (moveableX > 0.5) {
+                        float xDist = translateX;
+                        float curXPos = mod((pos.x + xDist) - gridLimits.x, limLen) + gridLimits.x;
+                        pos.x = curXPos;
+                    }
+    
+                    if (moveableZ > 0.5) {
+                        float zDist = speedZ * time;
+                        float curZPos = mod((pos.z + zDist) - gridLimits.x, limLen) + gridLimits.x;
+                        pos.z = curZPos;
+                    }
+    
+                    float k = 1.0 - (-pos.z / 400.0);
+                    vColor = color * k;
+    
+                    // Final position computation
                     gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
                 }
             `,
             fragmentShader: `
+                precision highp float;
                 varying vec3 vColor;
+    
                 void main() {
                     gl_FragColor = vec4(vColor, 1.0);
                 }
             `,
-            vertexColors: THREE.VertexColors
+            vertexColors: true // Enable vertex colors
         });
-
+    
+        // Add the grid to the scene
         scene.add(this.grid);
-
-        this.time = 0;    // Initialize time here
-        this.clock = new THREE.Clock();  // Initialize clock
     }
+    
 
-    _initializeScene(scene, camera) {
-        // Initializing ship and grid
-        this._createShip(scene);
-        this._createGrid(scene);
+    _initializeScene(scene, camera, replay) {
+        if (!replay) {
+            // first load
+            this._createShip(scene);
+            this._createGrid(scene);
 
-        // Adding objects to the scene
-        this.objectsParent = new THREE.Group();
-        scene.add(this.objectsParent);
 
-        for (let i = 0; i < 10; i++)
-            this._spawnObstacle();
-        for (let i = 0; i < 10; i++)
-            this._spawnBonus();
+            this.objectsParent = new THREE.Group();
+            scene.add(this.objectsParent);
+
+            for (let i = 0; i < 10; i++)
+                this._spawnObstacle();
+            for (let i = 0; i < 10; i++)
+                this._spawnBonus();
+            
+            camera.rotateX(-20 * Math.PI / 180);
+            camera.position.set(0, 1.5, 2);
+        } else {
+            //replay
+            this.objectsParent.traverse((item) => {
+                if (item instanceof THREE.Mesh) {
+                    //child item
+                    if (item.userData.type === 'obstacle') {
+                        this._setupObstacle(item);
+                    } else 
+                        item.userData.price = this._setupBonus(item);
+                } else {
+                    item.position.set(0, 0, 0);
+                    // the anchor itself
+                }
+            })
+        }
         
-        // Set camera rotation and position
-        camera.rotateX(-20 * Math.PI / 180);
-        camera.position.set(0, 1.5, 2);
     }
 
     _spawnObstacle() {
@@ -331,6 +415,52 @@ class Game {
         );
 
         return price;
+    }
+
+    _shakeCamera(initialPosition, remainingShakes = 3) {
+        const $this = this;
+
+        const startPosition = {
+            x: initialPosition.x,
+            y: initialPosition.y,
+            z: initialPosition.z
+        };
+
+        const startOffset = {x: 0, y: 0};
+        const endOffset = {
+            x: this._randomFloat(-0.25, 0.25),
+            y: this._randomFloat(-0.25, 0.25),
+        };
+
+        this.cameraLerp = new Lerp(startOffset, endOffset, this._randomFloat(0.1, 0.22))
+            .onUpdate((value) => {
+                $this.camera.position.set(
+                    startPosition.x + value.x,
+                    startPosition.y + value.y,
+                    startPosition.z
+                )
+            })
+            .onFinish(() => {
+                if (remainingShakes > 0)
+                    $this._shakeCamera(initialPosition, remainingShakes - 1);
+                else 
+                    $this.cameraLerp = null;
+                    $this.camera.position.set(
+                        initialPosition.x,
+                        initialPosition.y,
+                        initialPosition.z
+                    );
+            })
+        }
+
+    _createScorePopup(score) {
+        const scorePopup = document.createElement('div');
+        scorePopup.innerText = `+${score}`;
+        scorePopup.className = 'score-popup';
+        document.body.appendChild(scorePopup);
+        setTimeout(() => {
+            scorePopup.remove();
+        }, 1000);
     }
 
     _randomFloat(min, max) {

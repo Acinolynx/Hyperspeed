@@ -20,9 +20,6 @@ body{
     display: flex;
 }
 
-#score-row span, #distance-row span {
-    white-space: nowrap;
-}
 #score,
 #distance {
     margin-left: 0.5rem;
@@ -73,7 +70,8 @@ body{
     box-shadow: -100px 0 0 100px #4194e2;
 }
 
-#intro-panel {
+#intro-panel,
+#game-over-panel {
     display: grid;
     place-items: center;
     position: absolute;
@@ -87,16 +85,23 @@ body{
     z-index: 10;
 }
 
-#intro-column {
+#game-over-panel {
+    display: none;
+}
+
+#intro-column,
+#game-over-column {
     text-align: center;
 }
 
-#intro-title {
+#intro-title,
+#game-over-title {
     font-size: 3em;
     margin-bottom: 3em;
 }
 
-#start-button {
+#start-button,
+#replay-button {
     background-color: black;
     color: white;
     font-family: monospace;
@@ -105,6 +110,41 @@ body{
     cursor: pointer;
 }
 
-#start-button:hover {
+#start-button:hover,
+#-button:hover {
     background-color: #0f0f5c;
+}
+
+#game-over-score-row,
+#game-over-distance-row{
+    display: flex;
+    justify-content: center;
+    margin-bottom: 1rem;
+    font-size: 1.3rem;
+}
+
+#game-over-score,
+#game-over-distance {
+    margin-left: 0.5rem;
+}
+
+.score-popup {
+    position: absolute;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    animation: score-popup 1s ease-in-out;
+    animation-iteration-count: 1;
+    font-size: 30px;
+    color: #eee;
+}
+
+@keyframes score-popup {
+    0% {
+        top: 33%;
+        opacity: 1;
+    }
+    100% {
+        top: 25%;
+        opacity: 0;
+    }
 }
