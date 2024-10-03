@@ -83,10 +83,17 @@ body{
     color: white;
     font-family: monospace;
     z-index: 10;
+    opacity: 1;
+    transition: opacity 1.5s ease-in-out;
 }
 
 #game-over-panel {
     display: none;
+}
+
+.hidden {
+    opacity: 0;
+    pointer-events: none;
 }
 
 #intro-column,

@@ -96,6 +96,10 @@ class Game {
         }
     }
 
+    _buildUI() {
+    
+    }
+
     _keyup() {
         this.speedX = 0;
         this._rotateShip(0, 0.5);
@@ -264,58 +268,70 @@ class Game {
     
         // Define a ShaderMaterial with fixed conditions
         this.grid.material = new THREE.ShaderMaterial({
-            uniforms: {
-                speedZ: { value: this.speedZ },
-                translateX: { value: this.translateX },
-                gridLimits: { value: new THREE.Vector2(-gridLimit, gridLimit) },
-                time: { value: 0 }
-            },
-            vertexShader: `
-                uniform float time;
-                uniform vec2 gridLimits;
-                uniform float speedZ;
-                uniform float translateX;
-    
-                attribute float moveableX;
-                attribute float moveableZ;
-                attribute vec3 color; // Assuming a color attribute is used
-    
-                varying vec3 vColor;
-    
-                void main() {
-                    float limLen = gridLimits.y - gridLimits.x;
-                    vec3 pos = position;
-    
-                    // Use more straightforward conditions
-                    if (moveableX > 0.5) {
-                        float xDist = translateX;
-                        float curXPos = mod((pos.x + xDist) - gridLimits.x, limLen) + gridLimits.x;
-                        pos.x = curXPos;
-                    }
-    
-                    if (moveableZ > 0.5) {
-                        float zDist = speedZ * time;
-                        float curZPos = mod((pos.z + zDist) - gridLimits.x, limLen) + gridLimits.x;
-                        pos.z = curZPos;
-                    }
-    
-                    float k = 1.0 - (-pos.z / 400.0);
-                    vColor = color * k;
-    
-                    // Final position computation
-                    gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+    uniforms: {
+        speedZ: { value: this.speedZ },
+        translateX: { value: this.translateX },
+        gridLimits: { value: new THREE.Vector2(-gridLimit, gridLimit) },
+        time: { value: 0 }
+    },
+    vertexShader: `
+        uniform float time;
+        uniform vec2 gridLimits;
+        uniform float speedZ;
+        uniform float translateX;
+
+        attribute float moveableX;
+        attribute float moveableZ;
+
+        varying vec3 vColor;
+
+        void main() {
+            float limLen = gridLimits.y - gridLimits.x;
+            vec3 pos = position;
+
+            // Movement in the X direction
+            if (moveableX > 0.5) {
+                float xDist = mod(translateX, limLen);  // Ensure smooth wrapping for X
+                pos.x += xDist;
+                if (pos.x > gridLimits.y) {
+                    pos.x -= limLen;
                 }
-            `,
-            fragmentShader: `
-                precision highp float;
-                varying vec3 vColor;
-    
-                void main() {
-                    gl_FragColor = vec4(vColor, 1.0);
+                if (pos.x < gridLimits.x) {
+                    pos.x += limLen;
                 }
-            `,
-            vertexColors: true // Enable vertex colors
-        });
+            }
+
+            // Movement in the Z direction
+            if (moveableZ > 0.5) {
+                float zDist = mod(speedZ * time, limLen);  // Ensure smooth wrapping for Z
+                pos.z += zDist;
+                if (pos.z > gridLimits.y) {
+                    pos.z -= limLen;
+                }
+                if (pos.z < gridLimits.x) {
+                    pos.z += limLen;
+                }
+            }
+
+            // Apply some scaling factor for color fading over distance
+            float k = 1.0 - (-pos.z / 400.0);
+            vColor = color * k;
+
+            // Compute the final vertex position
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+        }
+    `,
+    fragmentShader: `
+        varying vec3 vColor;
+
+        void main() {
+            // Output the color for the fragment
+            gl_FragColor = vec4(vColor, 1.);
+        }
+    `,
+    vertexColors: THREE.VertexColors
+});
+
     
         // Add the grid to the scene
         scene.add(this.grid);
