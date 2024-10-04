@@ -5,22 +5,24 @@ class Game {
 
     constructor(scene, camera) {
 
-        this.divScore = document.getElementById('score');
-        this.divDistance = document.getElementById('distance');
-        this.divHealth = document.getElementById('health');
+        // this.divScore = document.getElementById('score');
+        // this.divDistance = document.getElementById('distance');
+        // this.divHealth = document.getElementById('health');
 
-        this.divGameOverPanel = document.getElementById('game-over-panel');
-        this.divGameOverScore = document.getElementById('game-over-score');
-        this.divGameOverDistance = document.getElementById('game-over-distance');
+        // this.divGameOverPanel = document.getElementById('game-over-panel');
+        // this.divGameOverScore = document.getElementById('game-over-score');
+        // this.divGameOverDistance = document.getElementById('game-over-distance');
 
-        document.getElementById('start-button').onclick = () => {
-            this.running = true;
-            document.getElementById('intro-panel').style.display = 'none';
-        };
-        document.getElementById('replay-button').onclick = () => {
-            this.running = true;
-            this.divGameOverPanel.style.display = 'none';
-        };
+        // document.getElementById('start-button').onclick = () => {
+        //     this.running = true;
+        //     document.getElementById('intro-panel').style.display = 'none';
+        // };
+        // document.getElementById('replay-button').onclick = () => {
+        //     this.running = true;
+        //     this.divGameOverPanel.style.display = 'none';
+        // };
+
+        this._buildUI();
 
         this.scene = scene;
         this.camera = camera;
@@ -97,7 +99,120 @@ class Game {
     }
 
     _buildUI() {
-    
+        // info panel
+        const infoPanel = document.createElement('div');
+        infoPanel.id = 'info';
+        const infoTitle = document.createElement('div');
+        infoTitle.id = 'title';
+        infoTitle.innerText = 'Captain\'s log';
+        infoPanel.appendChild(infoTitle);
+        
+        const infoDivider1 = document.createElement('div');
+        infoDivider1.className = 'divider';
+        infoPanel.appendChild(infoDivider1);
+
+        const infoScore = document.createElement('div');
+        infoScore.id = 'score-row';
+        const infoScoreLabel = document.createElement('div');
+        infoScoreLabel.innerText = 'Score:';
+        this.divScore = document.createElement('div');
+        this.divScore.id = 'score';
+        infoScore.appendChild(infoScoreLabel);
+        infoScore.appendChild(this.divScore);
+        infoPanel.appendChild(infoScore);
+
+        const infoDistance = document.createElement('div');
+        infoDistance.id = 'distance-row';
+        const infoDistanceLabel = document.createElement('div');
+        infoDistanceLabel.innerText = 'Distance:';
+        this.divDistance = document.createElement('div');
+        this.divDistance.id = 'distance';
+        infoDistance.appendChild(infoDistanceLabel);
+        infoDistance.appendChild(this.divDistance);
+        infoPanel.appendChild(infoDistance);
+
+        const infoDivider2 = document.createElement('div');
+        infoDivider2.className = 'divider';
+        infoPanel.appendChild(infoDivider2);
+
+        const infoInputLabel = document.createElement('div');
+        infoInputLabel.innerText = 'Ship\'s Integrity:';
+        infoPanel.appendChild(infoInputLabel);
+
+        this.divHealth = document.createElement('input');
+        this.divHealth.id = 'health';
+        this.divHealth.setAttribute('type', 'range');
+        this.divHealth.setAttribute('min', 0);
+        this.divHealth.setAttribute('max', 100);
+        this.divHealth.setAttribute('disabled', true);
+        infoPanel.appendChild(this.divHealth);
+
+        document.body.appendChild(infoPanel);
+
+        // intro panel
+        const introPanel = document.createElement('div');
+        introPanel.id = 'intro-panel';
+        const introCol = document.createElement('div');
+        introCol.id = 'intro-column';
+        const introTitle = document.createElement('div');
+        introTitle.id = 'intro-title';
+        introTitle.innerText = 'Hyperspeed';
+        introCol.appendChild(introTitle);
+        const introStartButton = document.createElement('button');
+        introStartButton.id = 'start-button';
+        introStartButton.innerText = 'Start';
+        introStartButton.onclick = () => {
+        this.running = true;
+        document.getElementById('intro-panel').classList.add('hidden');
+        };
+        introCol.appendChild(introStartButton);
+        introPanel.appendChild(introCol);
+        
+        document.body.appendChild(introPanel);
+
+        // game over panel
+        this.divGameOverPanel = document.createElement('div');
+        this.divGameOverPanel.id = 'game-over-panel';
+        this.divGameOverPanel.className = 'hidden';
+        const gameOverCol = document.createElement('div');
+        gameOverCol.id = 'game-over-column';
+        
+        const gameOverTitle = document.createElement('div');
+        gameOverTitle.id = 'game-over-title';
+        gameOverTitle.innerText = 'Hyperspeed';
+        gameOverCol.appendChild(gameOverTitle);
+
+        const gameOverScore = document.createElement('div');
+        gameOverScore.id = 'game-over-score-row';
+        const gameOverScoreLabel = document.createElement('div');
+        gameOverScoreLabel.innerText = 'Score:';
+        this.divGameOverScore = document.createElement('div');
+        this.divGameOverScore.id = 'game-over-score';
+        gameOverScore.appendChild(gameOverScoreLabel);
+        gameOverScore.appendChild(this.divGameOverScore);
+        gameOverCol.appendChild(gameOverScore);
+
+        const gameOverDistance = document.createElement('div');
+        gameOverDistance.id = 'game-over-distance-row';
+        const gameOverDistanceLabel = document.createElement('div');
+        gameOverDistanceLabel.innerText = 'Distance:';
+        this.divGameOverDistance = document.createElement('div');
+        this.divGameOverDistance.id = 'game-over-distance';
+        gameOverDistance.appendChild(gameOverDistanceLabel);
+        gameOverDistance.appendChild(this.divGameOverDistance);
+        gameOverCol.appendChild(gameOverDistance);
+
+        const gameOverReplayButton = document.createElement('button');
+        gameOverReplayButton.id = 'replay-button';
+        gameOverReplayButton.innerText = 'Replay';
+        gameOverReplayButton.onclick = () => {
+        this.running = true;
+        this.divGameOverPanel.classList.add('hidden');
+        };
+        gameOverCol.appendChild(gameOverReplayButton);
+        this.divGameOverPanel.appendChild(gameOverCol);
+        
+        document.body.appendChild(this.divGameOverPanel);
     }
 
     _keyup() {
@@ -117,8 +232,9 @@ class Game {
 
         this.grid.material.uniforms.speedZ.value = this.speedZ;
         this.grid.material.uniforms.time.value = this.time;
-        this.objectsParent.position.z = this.speedZ * this.time;
         this.grid.material.uniforms.translateX.value = this.translateX;
+
+        this.objectsParent.position.z = this.speedZ * this.time;
         this.objectsParent.position.x = this.translateX;
 
         this.objectsParent.traverse((child) => {
@@ -153,8 +269,9 @@ class Game {
                     console.log("Collision detected with:", child.userData.type);
 
                     if (child.userData.type === 'obstacle') {
-                        if (soundAudio)
-                            soundAudio.play('collect-coin');
+                        if (soundHit) {
+                            soundHit.play();
+                        }
                         this.health -= 10;
                         this.divHealth.value = this.health;
                         this._setupObstacle(...params);
@@ -168,7 +285,7 @@ class Game {
                         }
                         else{
                             if (soundAudio) {
-                                soundAudio.play('collect-coin');
+                                soundAudio.play();
                             }
                         
                         this._createScorePopup(child.userData.price);
@@ -192,11 +309,9 @@ class Game {
 
         this.divGameOverScore.innerText = this.score;
         this.divGameOverDistance.innerText = this.objectsParent.position.z.toFixed(0);
-        setTimeout(() => {
-            this.divGameOverPanel.style.display = 'grid';
+        this.divGameOverPanel.classList.remove('hidden');
 
-            this._reset(true);
-        }, 1000);
+        this._reset(true);
     }
 
     _createShip(scene) {
@@ -253,13 +368,12 @@ class Game {
         let gridLimit = 200;
         this.grid = new THREE.GridHelper(gridLimit + 2, divisions, 0xccddee, 0xccddee);
     
-        const moveableX = [];
-        const moveableZ = [];
-        
-        // Properly fill the moveableX and moveableZ arrays with float values (0.0 or 1.0)
-        for (let i = 0; i <= divisions; i++) {
-            moveableX.push(0.0, 0.0, 1.0, 1.0); // Floats, not integers
-            moveableZ.push(1.0, 1.0, 0.0, 0.0); // Floats, not integers
+        const moveableX = new Float32Array(divisions * 4);
+        const moveableZ = new Float32Array(divisions * 4);
+
+        for (let i = 0; i < divisions; i++) {
+            moveableX.set([0.0, 0.0, 1.0, 1.0], i * 4);
+            moveableZ.set([1.0, 1.0, 0.0, 0.0], i * 4);
         }
     
         // Set attributes using Float32Array instead of Uint8Array

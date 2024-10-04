@@ -87,11 +87,8 @@ body{
     transition: opacity 1.5s ease-in-out;
 }
 
-#game-over-panel {
-    display: none;
-}
-
-.hidden {
+#intro-panel.hidden,
+#game-over-panel.hidden {
     opacity: 0;
     pointer-events: none;
 }
