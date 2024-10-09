@@ -1,4 +1,4 @@
-class Lerp {
+export class Lerp {
 
     constructor(from, to, delay) {
         this.from = from;

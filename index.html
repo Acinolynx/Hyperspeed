@@ -5,41 +5,42 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Hyperspeed</title>
     <link rel="stylesheet" href="./style/style.css">
-    <script src="./vendors/three.min.js"></script>
-    <script src="./vendors/howler.min.js"></script>
-    <script src="./script/audio-manager.js"></script>
-    <script src="./script/lerp.js"></script>
-    <script src="./script/game.js"></script>
-    <script src="./script/main.js"></script>
 
+    <!-- Define the import map -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.150.0/build/three.module.js",
+                "GLTFLoader": "https://unpkg.com/three@0.150.0/examples/jsm/loaders/GLTFLoader.js"
+            }
+        }
+    </script>
+
+    <script type="module" src="./vendors/howler.min.js"></script>
+    <script src="./script/audio-manager.js"></script>
 </head>
 <body>
-    <!--
-    <div id="info">
-        <div id="title">Captain's Log</div>
-        <diV class="divider"></diV>
-        <div id="score-row">Score: <div id="score"></div></div>
-        <div id="distance-row">Distance: <div id="distance"></div></div>
-        <div class="divider"></diV>
-        <div>Ship's Integrity:</div>    
-        <input id="health" type="range" min="0" max="100" disabled> 
-    </div>
-
-    <div id="intro-panel">
-        <div id="intro-column">
-            <div id="intro-title">Hyperspeed</div>
-            <button id="start-button">Start</button>
-        </div>
-    </div>
-
-    <div id="game-over-panel">
-        <div id="game-over-column">
-            <div id="game-over-title">Game Over!</div>
-            <div id="game-over-score-row">Score: <div id="game-over-score"></div></div>
-            <div id="game-over-distance-row">Distance: <div id="game-over-distance"></div></div>
-            <button id="replay-button">Replay</button>
-        </div>
-    </div>
-    -->
 </body>
+
+<script type="module">
+    // Import Three.js and GLTFLoader using the import map
+    import * as THREE from 'three';   // Import Three.js
+    import { GLTFLoader } from 'GLTFLoader';  // Import GLTFLoader
+    import { Game } from './script/game.js'; // Import your Game class
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    const gameInstance = new Game(scene, camera);
+
+    function animate() {
+        requestAnimationFrame(animate);
+        gameInstance.update();
+        renderer.render(scene, camera);
+    }
+    animate();
+</script>
 </html>

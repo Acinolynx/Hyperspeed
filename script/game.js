@@ -1,67 +1,68 @@
-class Game {
+import * as THREE from 'https://unpkg.com/three@0.150.0/build/three.module.js'; // Import Three.js
+import { GLTFLoader } from 'https://unpkg.com/three@0.150.0/examples/jsm/loaders/GLTFLoader.js'; // Import GLTFLoader
+import { Lerp } from './lerp.js'; // Import your Lerp class
+
+export class Game {
     OBSTACLE_PREFAB = new THREE.BoxBufferGeometry(1, 1, 1);
     OBSTACLE_MATERIAL = new THREE.MeshBasicMaterial({ color: 0xccddeee });
     BONUS_PREFAB = new THREE.SphereBufferGeometry(1, 12, 12);
 
     constructor(scene, camera) {
-
-        // this.divScore = document.getElementById('score');
-        // this.divDistance = document.getElementById('distance');
-        // this.divHealth = document.getElementById('health');
-
-        // this.divGameOverPanel = document.getElementById('game-over-panel');
-        // this.divGameOverScore = document.getElementById('game-over-score');
-        // this.divGameOverDistance = document.getElementById('game-over-distance');
-
-        // document.getElementById('start-button').onclick = () => {
-        //     this.running = true;
-        //     document.getElementById('intro-panel').style.display = 'none';
-        // };
-        // document.getElementById('replay-button').onclick = () => {
-        //     this.running = true;
-        //     this.divGameOverPanel.style.display = 'none';
-        // };
-
-        this._buildUI();
-
         this.scene = scene;
         this.camera = camera;
-        this._reset(false);
-        
+        this.loader = new GLTFLoader();
+        this._buildUI();
+        this._addLighting();
+    
+        this.running = false;
+        this.speedZ = 20;
+        this.speedX = 0; // -1: left, 0: straight, 1: right
+        this.translateX = 0;
+        this.time = 0;
+        this.clock = new THREE.Clock();
+        this.health = 100;
+        this.score = 0;
+        this.rotationLerp = null;
+        this.cameraLerp = null;
+
+        this.audioManager = setupAudio();
+    
         document.addEventListener('keydown', this._keydown.bind(this));
         document.addEventListener('keyup', this._keyup.bind(this));
-
-        // Initialize clock for delta time calculation
-        this.clock = new THREE.Clock();
+    
+        this.objectsParent = new THREE.Group();
+        this.scene.add(this.objectsParent);
+    
+        // Ensure to call _createSea with the correct context
+        this._createSea(); // <-- Ensure this method call is correct
+        this._createShip();
+        this._reset(false);
     }
+    
 
     update() {
-        if (!this.running)
-            return;
+        if (!this.running) return;
 
         const timeDelta = this.clock.getDelta();
         this.time += timeDelta;
 
-        if (this.rotationLerp !== null) {
-            this.rotationLerp.update(timeDelta);
-        }
-        if (this.cameraLerp !== null) {
-            this.cameraLerp.update(timeDelta);
-        }
+        if (this.rotationLerp !== null) this.rotationLerp.update(timeDelta);
+        if (this.cameraLerp !== null) this.cameraLerp.update(timeDelta);
 
-        this.translateX += this.speedX * -0.05;
-
-        this._updateGrid();
-        this._checkCollisions();
-        this._updateInfoPanel();
+        this._updateGrid(); 
+        this._updateSea(); 
+        this._checkCollisions(); 
+        this._updateInfoPanel(); 
     }
 
     _reset(replay) {
         this.running = false;
 
+
         this.speedZ = 20;
-        this.speedX = 0; // -1: left, 0: straight, 1: right
+        this.speedX = 0;
         this.translateX = 0;
+
 
         this.time = 0;
         this.clock = new THREE.Clock();
@@ -72,11 +73,11 @@ class Game {
         this.rotationLerp = null;
         this.cameraLerp = null;
 
-        this.divScore.innerText = this.score;
+        this.divScore.innerText = Math.floor(this.score);
         this.divDistance.innerText = 0;
         this.divHealth.value = this.health;
 
-        this._initializeScene(this.scene, this.camera, replay);
+        this._initializeScene(replay);
     }
 
     _keydown(event) {
@@ -91,12 +92,13 @@ class Game {
             default:
                 return;
         }
-
+    
         if (this.speedX !== newSpeedX) {
             this.speedX = newSpeedX;
             this._rotateShip(-this.speedX * 20 * Math.PI / 180, 0.8);
         }
     }
+    
 
     _buildUI() {
         // info panel
@@ -220,6 +222,15 @@ class Game {
         this._rotateShip(0, 0.5);
     }
 
+    _addLighting() {
+        const ambientLight = new THREE.AmbientLight(0x404040); // Soft white light
+        this.scene.add(ambientLight);
+
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 1); // Bright directional light
+        directionalLight.position.set(5, 5, 5).normalize(); // Position it to shine on the objects
+        this.scene.add(directionalLight);
+    }
+
     _rotateShip(targetRotation, delay) {
         const $this = this;
         this.rotationLerp = new Lerp(this.ship.rotation.z, targetRotation, delay)
@@ -227,15 +238,37 @@ class Game {
             .onFinish(() => { $this.rotationLerp = null; });
     }
 
+    _updateMovement(timeDelta) {
+        this.objectsParent.traverse((child) => {
+            if (child instanceof THREE.Mesh) {
+                // Move obstacles and bonuses toward the ship on the Z-axis
+                child.position.z -= this.speedZ * timeDelta; 
+        
+                // Check if the object has gone past the ship
+                if (child.position.z < this.ship.position.z - 10) {
+                    this._resetObjectPosition(child); // Reset obstacle position
+                }
+            }
+        });
+    }
+    
+    _resetObjectPosition(obj) {
+        // Reset object's position to spawn it in front of the ship
+        obj.position.set(
+            this._randomFloat(-30, 30),  // Random X position
+            obj.scale.y * 0.5,           // Y position based on scale
+            this.ship.position.z + 50 + this._randomFloat(0, 100) // Spawn it ahead of the ship
+        );
+    }
+    
+    // Ensure to include this in your update logic to manage grid and objects
     _updateGrid() {
+        // Update sea speed
         this.speedZ += 0.002;
 
-        this.grid.material.uniforms.speedZ.value = this.speedZ;
-        this.grid.material.uniforms.time.value = this.time;
-        this.grid.material.uniforms.translateX.value = this.translateX;
-
-        this.objectsParent.position.z = this.speedZ * this.time;
-        this.objectsParent.position.x = this.translateX;
+        // Move obstacles and bonuses towards the ship
+        this.objectsParent.position.z = this.speedZ * this.time; 
+        this.objectsParent.position.x = this.translateX; 
 
         this.objectsParent.traverse((child) => {
             if (child instanceof THREE.Mesh) {
@@ -299,234 +332,138 @@ class Game {
     }
 
     _updateInfoPanel() {
-        // Handle info panel updates 
         this.divDistance.innerText = this.objectsParent.position.z.toFixed(0);
     }
 
     _gameOver() {
-        // Handle game over logic
         this.running = false;
-
         this.divGameOverScore.innerText = this.score;
         this.divGameOverDistance.innerText = this.objectsParent.position.z.toFixed(0);
         this.divGameOverPanel.classList.remove('hidden');
-
         this._reset(true);
     }
 
-    _createShip(scene) {
-        const shipBody = new THREE.Mesh(
-            new THREE.TetrahedronBufferGeometry(0.4, 0),
-            new THREE.MeshBasicMaterial({ color: 0xbbccdd })
+    _createShip() {
+        if (this.ship) {
+            console.warn('Ship model already loaded, skipping creation.');
+            return; // If the ship exists, do not load it again
+        }
+
+        console.log('Loading GLTF ship model...');
+        this.loader.load(
+            './assets/model/ship_light.gltf',  // Path to your GLTF model
+            (gltf) => {
+                console.log('GLTF model loaded successfully:', gltf);
+                this.ship = gltf.scene;  // Set the ship model
+                this.ship.scale.set(0.1, 0.1, 0.1);  // Adjust size
+                this.ship.position.set(0, 0.5, 0);  // Set position
+                this.ship.position.z = 2; // Ensure ship is in front of the camera
+                this.scene.add(this.ship);  // Add the ship to the scene
+            },
+            undefined,
+            (error) => {
+                console.error('An error occurred while loading the GLTF model:', error); // Log error
+            }
         );
-
-        shipBody.rotateX(45 * Math.PI / 180);
-        shipBody.rotateY(45 * Math.PI / 180);
-
-        this.ship = new THREE.Group();
-        this.ship.add(shipBody);
-
-        scene.add(this.ship);
-
-        const reactorSocketGeometry = new THREE.CylinderBufferGeometry(0.08, 0.08, 0.1, 16);
-        const reactorSocketMaterial = new THREE.MeshBasicMaterial({ color: 0x99aacc });
-        const reactorSocket1 = new THREE.Mesh(reactorSocketGeometry, reactorSocketMaterial);
-        const reactorSocket2 = new THREE.Mesh(reactorSocketGeometry, reactorSocketMaterial);
-        const reactorSocket3 = new THREE.Mesh(reactorSocketGeometry, reactorSocketMaterial);
-
-        this.ship.add(reactorSocket1);
-        this.ship.add(reactorSocket2);
-        this.ship.add(reactorSocket3);
-
-        reactorSocket1.rotateX(90 * Math.PI / 180);
-        reactorSocket1.position.set(-0.15, 0, 0.1);
-        reactorSocket2.rotateX(90 * Math.PI / 180);
-        reactorSocket2.position.set(0.15, 0, 0.1);
-        reactorSocket3.rotateX(90 * Math.PI / 180);
-        reactorSocket3.position.set(0., -0.15, 0.1);
-
-        const reactorLightGeometry = new THREE.CylinderBufferGeometry(0.055, 0.055, 0.1, 16);
-        const reactorLightMaterial = new THREE.MeshBasicMaterial({ color: 0xaadeff });
-        const reactorLight1 = new THREE.Mesh(reactorLightGeometry, reactorLightMaterial);
-        const reactorLight2 = new THREE.Mesh(reactorLightGeometry, reactorLightMaterial);
-        const reactorLight3 = new THREE.Mesh(reactorLightGeometry, reactorLightMaterial);
-
-        this.ship.add(reactorLight1);
-        this.ship.add(reactorLight2);
-        this.ship.add(reactorLight3);
-
-        reactorLight1.rotateX(90 * Math.PI / 180);
-        reactorLight1.position.set(-0.15, 0, 0.11);
-        reactorLight2.rotateX(90 * Math.PI / 180);
-        reactorLight2.position.set(0.15, 0, 0.11);
-        reactorLight3.rotateX(90 * Math.PI / 180);
-        reactorLight3.position.set(0., -0.15, 0.11);
     }
 
-    _createGrid(scene) {
-        let divisions = 30;
-        let gridLimit = 200;
-        this.grid = new THREE.GridHelper(gridLimit + 2, divisions, 0xccddee, 0xccddee);
+    _createSea() {
+        const seaSize = 200; // Size of the sea
+        const seaGeometry = new THREE.PlaneGeometry(seaSize, seaSize); // Create a plane geometry
     
-        const moveableX = new Float32Array(divisions * 4);
-        const moveableZ = new Float32Array(divisions * 4);
+        // Load texture for the sea
+        const seaTextureLoader = new THREE.TextureLoader();
+        const seaTexture = seaTextureLoader.load('./assets/image/water.jpg'); // Use your texture image path
+        seaTexture.wrapS = THREE.RepeatWrapping; // Repeat the texture horizontally
+        seaTexture.wrapT = THREE.RepeatWrapping; // Repeat the texture vertically
+        seaTexture.repeat.set(4, 4); // Set how many times to repeat the texture
+    
+        // Create the material with the texture
+        const seaMaterial = new THREE.MeshBasicMaterial({ map: seaTexture, side: THREE.DoubleSide });
+    
+        this.sea = new THREE.Mesh(seaGeometry, seaMaterial); // Create the sea mesh
+        this.sea.rotation.x = -Math.PI / 2; // Rotate the plane to be horizontal
+        this.scene.add(this.sea); // Add the sea to the scene
+    
+        // Initialize the sea movement parameters
+        this.seaSpeedZ = 0.5; // Speed for the sea movement
+    }    
 
-        for (let i = 0; i < divisions; i++) {
-            moveableX.set([0.0, 0.0, 1.0, 1.0], i * 4);
-            moveableZ.set([1.0, 1.0, 0.0, 0.0], i * 4);
+    _updateSea() {
+        // Move the sea to simulate movement
+        this.sea.position.z += this.seaSpeedZ;
+    
+        // Reset position to create a continuous movement effect
+        if (this.sea.position.z > 50) { // Adjust based on your needs
+            this.sea.position.z = 0; // Reset to original position
         }
-    
-        // Set attributes using Float32Array instead of Uint8Array
-        this.grid.geometry.setAttribute('moveableX', new THREE.BufferAttribute(new Float32Array(moveableX), 1));
-        this.grid.geometry.setAttribute('moveableZ', new THREE.BufferAttribute(new Float32Array(moveableZ), 1));
-    
-        // Define a ShaderMaterial with fixed conditions
-        this.grid.material = new THREE.ShaderMaterial({
-    uniforms: {
-        speedZ: { value: this.speedZ },
-        translateX: { value: this.translateX },
-        gridLimits: { value: new THREE.Vector2(-gridLimit, gridLimit) },
-        time: { value: 0 }
-    },
-    vertexShader: `
-        uniform float time;
-        uniform vec2 gridLimits;
-        uniform float speedZ;
-        uniform float translateX;
-
-        attribute float moveableX;
-        attribute float moveableZ;
-
-        varying vec3 vColor;
-
-        void main() {
-            float limLen = gridLimits.y - gridLimits.x;
-            vec3 pos = position;
-
-            // Movement in the X direction
-            if (moveableX > 0.5) {
-                float xDist = mod(translateX, limLen);  // Ensure smooth wrapping for X
-                pos.x += xDist;
-                if (pos.x > gridLimits.y) {
-                    pos.x -= limLen;
-                }
-                if (pos.x < gridLimits.x) {
-                    pos.x += limLen;
-                }
-            }
-
-            // Movement in the Z direction
-            if (moveableZ > 0.5) {
-                float zDist = mod(speedZ * time, limLen);  // Ensure smooth wrapping for Z
-                pos.z += zDist;
-                if (pos.z > gridLimits.y) {
-                    pos.z -= limLen;
-                }
-                if (pos.z < gridLimits.x) {
-                    pos.z += limLen;
-                }
-            }
-
-            // Apply some scaling factor for color fading over distance
-            float k = 1.0 - (-pos.z / 400.0);
-            vColor = color * k;
-
-            // Compute the final vertex position
-            gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
-        }
-    `,
-    fragmentShader: `
-        varying vec3 vColor;
-
-        void main() {
-            // Output the color for the fragment
-            gl_FragColor = vec4(vColor, 1.);
-        }
-    `,
-    vertexColors: THREE.VertexColors
-});
-
-    
-        // Add the grid to the scene
-        scene.add(this.grid);
     }
-    
 
-    _initializeScene(scene, camera, replay) {
+    _initializeScene(replay) {
         if (!replay) {
-            // first load
-            this._createShip(scene);
-            this._createGrid(scene);
-
 
             this.objectsParent = new THREE.Group();
-            scene.add(this.objectsParent);
+            this.scene.add(this.objectsParent);
 
             for (let i = 0; i < 10; i++)
                 this._spawnObstacle();
             for (let i = 0; i < 10; i++)
                 this._spawnBonus();
-            
-            camera.rotateX(-20 * Math.PI / 180);
-            camera.position.set(0, 1.5, 2);
+
+            this.camera.rotateX(-20 * Math.PI / 180);
+            this.camera.position.set(0, 1.5, 3);
+            this.camera.lookAt(0, 0, 0);
         } else {
-            //replay
+            // Replay logic
             this.objectsParent.traverse((item) => {
                 if (item instanceof THREE.Mesh) {
-                    //child item
                     if (item.userData.type === 'obstacle') {
                         this._setupObstacle(item);
-                    } else 
+                    } else {
                         item.userData.price = this._setupBonus(item);
+                    }
                 } else {
                     item.position.set(0, 0, 0);
-                    // the anchor itself
                 }
-            })
+            });
         }
-        
     }
 
     _spawnObstacle() {
-        // create obstacles
         const obj = new THREE.Mesh(
             this.OBSTACLE_PREFAB,
             this.OBSTACLE_MATERIAL
         );
-        // get random scale
         this._setupObstacle(obj);
-
         obj.userData = { type: 'obstacle' };
-
         this.objectsParent.add(obj);
     }
 
     _setupObstacle(obj, refXpos = 0, refZpos = 0) {
-        // random scale
         obj.scale.set(
             this._randomFloat(0.5, 2),
             this._randomFloat(0.5, 2),
             this._randomFloat(0.5, 2),
         );
 
-        // random position
         obj.position.set(
-            refXpos + this._randomFloat(-30, 30),
-            obj.scale.y * 0.5,
-            refZpos - 100 - this._randomFloat(0, 100),
+            refXpos + this._randomFloat(-30, 30), // Random X position
+            obj.scale.y * 0.5,                   // Y position based on scale
+            refZpos - 100 - this._randomFloat(0, 100) // Z position ahead of the ship
         );
     }
 
+
     _spawnBonus() {
-        // Spawning bonuses
         const obj = new THREE.Mesh(
             this.BONUS_PREFAB,
-            new THREE.MeshBasicMaterial({color: 0x000000})
+            new THREE.MeshBasicMaterial({ color: 0x000000 })
         );
         const price = this._setupBonus(obj);
         obj.userData = { type: 'bonus', price };
         this.objectsParent.add(obj);
     }
+
 
     _setupBonus(obj, refXpos = 0, refZpos = 0) {
         const price = this._randomInt(5, 20);
@@ -556,7 +493,7 @@ class Game {
             z: initialPosition.z
         };
 
-        const startOffset = {x: 0, y: 0};
+        const startOffset = { x: 0, y: 0 };
         const endOffset = {
             x: this._randomFloat(-0.25, 0.25),
             y: this._randomFloat(-0.25, 0.25),
@@ -573,15 +510,16 @@ class Game {
             .onFinish(() => {
                 if (remainingShakes > 0)
                     $this._shakeCamera(initialPosition, remainingShakes - 1);
-                else 
+                else {
                     $this.cameraLerp = null;
                     $this.camera.position.set(
                         initialPosition.x,
                         initialPosition.y,
                         initialPosition.z
                     );
-            })
-        }
+                }
+            });
+    }
 
     _createScorePopup(score) {
         const scorePopup = document.createElement('div');
